@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Price Is Right - 2-Team Guessing Game</title>
+    <!-- Tailwind Play CDN for modern visuals and exact design fidelity -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        blue: {
+                            850: '#1e3a8a',
+                            950: '#030712',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617; /* Slate 950 base */
+            color: white;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        
+        /* Smooth transitions for high fidelity */
+        .page-transition {
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 3D solid shadows matching the game-show style */
+        .btn-3d-rose {
+            background-color: #e11d48;
+            color: white;
+            box-shadow: 0 8px 0 0 #9f1239;
+            transition: all 0.1s ease;
+        }
+        .btn-3d-rose:hover {
+            transform: translateY(2px);
+            box-shadow: 0 6px 0 0 #9f1239;
+        }
+        .btn-3d-rose:active {
+            transform: translateY(8px);
+            box-shadow: 0 0px 0 0 transparent;
+        }
+
+        .btn-3d-blue {
+            background-color: #1d4ed8;
+            color: white;
+            box-shadow: 0 6px 0 0 #1e3a8a;
+            transition: all 0.1s ease;
+        }
+        .btn-3d-blue:hover {
+            transform: translateY(2px);
+            box-shadow: 0 4px 0 0 #1e3a8a;
+        }
+        .btn-3d-blue:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 0 transparent;
+        }
+
+        /* Custom scrollbar for manage item screen */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2563eb;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3b82f6;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 selection:bg-rose-600 selection:text-white">
+
+    <!-- FLOATING ACTION RAIL FOR FULLSCREEN CONVENIENCE -->
+    <div class="fixed top-4 left-4 z-50 flex gap-2">
+        <button 
+          onclick="toggleDocFullscreen()"
+          class="bg-black/40 text-white/90 px-3 py-2 rounded-full hover:bg-black/60 transition-all flex items-center justify-center cursor-pointer border border-white/10 shadow-lg"
+          title="Toggle Fullscreen"
+        >
+          <!-- Maximize Icon by Default -->
+          <svg id="fullscreen-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15"></path>
+          </svg>
+        </button>
+    </div>
+
+    <!-- GAME WRAPPER WITH DESKTOP CONTAINER ASPECT RATIO -->
+    <div class="w-full max-w-4xl mx-auto min-h-[580px] flex flex-col justify-between relative bg-blue-900 p-6 md:p-8 rounded-[2.5rem] border-8 border-blue-400 shadow-2xl overflow-hidden">
+        
+        <!-- TOP DECORATIVE PANEL: HOME / IN-GAME SCORE / TITLE EMBLEM -->
+        <div class="flex justify-between items-start z-10 w-full mb-6">
+            <!-- Small logo emblem on the left -->
+            <div id="top-logo-container" class="opacity-0 transition-opacity duration-300">
+                <div class="flex items-center gap-2 cursor-pointer" onclick="goToPage('home')">
+                    <!-- Stylized SVG logo miniature -->
+                    <div class="bg-white flex items-center justify-center w-8 h-8 rounded-lg shadow-md border border-blue-400">
+                      <span class="text-blue-900 font-black font-sans text-xs">$</span>
+                    </div>
+                    <div class="leading-none text-left">
+                        <div class="font-extrabold tracking-tight text-white text-sm">THE PRICE I<span class="text-amber-400 font-semibold">$</span></div>
+                        <div class="font-bold tracking-widest text-blue-300 text-[8px] uppercase">RIGHT</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Score board in-game HUD (visible on pages 3 and 4) -->
+            <div id="scoreboard" class="hidden transition-all duration-300 scale-100 flex gap-4">
+                <div class="bg-amber-400 border-4 border-white px-4 py-1.5 rounded-2xl flex items-center gap-2 shadow-lg text-blue-950">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-900 animate-pulse"></span>
+                    <span id="scoreboard-team-a-name" class="font-extrabold text-xs tracking-wide uppercase truncate max-w-[80px]">TEAM A</span>
+                    <span id="scoreboard-team-a-score" class="font-mono font-black text-sm bg-blue-950 px-2.5 py-0.5 rounded-lg text-white">0</span>
+                </div>
+                <div class="bg-rose-500 border-4 border-white px-4 py-1.5 rounded-2xl flex items-center gap-2 shadow-lg text-white">
+                    <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+                    <span id="scoreboard-team-b-name" class="font-extrabold text-xs tracking-wide uppercase truncate max-w-[80px]">TEAM B</span>
+                    <span id="scoreboard-team-b-score" class="font-mono font-black text-sm bg-[#5c0a1f] px-2.5 py-0.5 rounded-lg text-white">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================= SCREENS CONTAINERS ======================= -->
+        
+        <!-- PAGE 1: HOME SCREEN -->
+        <div id="page-home" class="page-transition flex flex-col items-center justify-center flex-1 py-4 gap-8">
+            <!-- THE PRICE IS RIGHT BOLD ITALIC LOGO -->
+            <div class="text-center py-6">
+                <h1 class="text-5xl md:text-6xl font-black italic tracking-tighter uppercase leading-none text-white select-none">
+                  THE PRICE I<span class="text-amber-400">$</span> RIGHT
+                </h1>
+                <p class="text-xs md:text-sm font-bold text-blue-300 uppercase mt-2 tracking-widest">TEAM CLASH SHOWDOWN</p>
+            </div>
+
+            <!-- Solid Crimson 3D Play Button -->
+            <button onclick="goToPage('setup'); playSfx('click');" class="btn-3d-rose px-16 py-5 rounded-full font-black text-2xl tracking-tighter uppercase border-4 border-white transition-all">
+                START
+            </button>
+        </div>
+
+
+        <!-- PAGE 2: TEAM SETUP -->
+        <div id="page-setup" class="page-transition hidden flex flex-col items-center justify-center flex-1 py-2 gap-6">
+            <!-- Small logo badge -->
+            <div class="text-center">
+                <h1 class="text-3xl font-black italic tracking-tighter uppercase leading-none text-white select-none">
+                  THE PRICE I<span class="text-amber-400">$</span> RIGHT
+                </h1>
+                <p class="text-[10px] font-bold text-blue-300 uppercase mt-1 tracking-widest">TEAM CLASH SETUP</p>
+            </div>
+
+            <div class="w-full max-w-xl flex flex-col items-center relative py-6">
+                <!-- Ternary-like organizational branch diagram lines -->
+                <div class="w-full h-16 relative">
+                    <svg class="w-full h-full" viewBox="0 0 600 64" preserveAspectRatio="none">
+                        <!-- Drops down from top-center (representing PLAY path) -->
+                        <path d="M 300 0 L 300 18" stroke="white" stroke-width="3" fill="none" />
+                        <!-- Horizontal extension bar -->
+                        <path d="M 110 18 L 490 18" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" />
+                        <!-- Vertical paths dropping to Left Team, Settings, and Right Team -->
+                        <path d="M 110 18 L 110 64" stroke="white" stroke-width="3" fill="none" />
+                        <path d="M 300 18 L 300 64" stroke="white" stroke-width="3" fill="none" />
+                        <path d="M 490 18 L 490 64" stroke="white" stroke-width="3" fill="none" />
+                    </svg>
+                </div>
+
+                <!-- Three Branches Layout (Flex columns mapped to SVG ends) -->
+                <div class="w-full flex justify-between gap-4 mt-2">
+                    <!-- Left Path: Team Name Input -->
+                    <div class="flex flex-col items-center w-[180px]">
+                        <label class="text-amber-400 font-extrabold text-[10px] uppercase tracking-widest mb-2">Team A</label>
+                        <input type="text" id="team-a-input" value="TEAM A" 
+                               class="w-full bg-blue-950 text-white border-2 border-blue-400 rounded-xl py-3 px-4 text-center font-black uppercase tracking-wide placeholder-blue-700 shadow-md focus:outline-none focus:ring-4 focus:ring-amber-400 focus:scale-105 transition-all text-xs">
+                    </div>
+
+                    <!-- Center Path: SETTINGS -->
+                    <div class="flex flex-col items-center pt-3 w-[180px]">
+                        <button onclick="goToPage('manage'); playSfx('click');" 
+                                class="bg-blue-800 border-2 border-blue-400 text-white font-bold text-[10px] tracking-widest px-5 py-2.5 rounded-xl uppercase shadow-md transition-all hover:bg-blue-700 hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5 w-full">
+                            SETTINGS
+                        </button>
+                    </div>
+
+                    <!-- Right Path: Team Name Input -->
+                    <div class="flex flex-col items-center w-[180px]">
+                        <label class="text-rose-400 font-extrabold text-[10px] uppercase tracking-widest mb-2">Team B</label>
+                        <input type="text" id="team-b-input" value="TEAM B" 
+                               class="w-full bg-blue-950 text-white border-2 border-blue-400 rounded-xl py-3 px-4 text-center font-black uppercase tracking-wide placeholder-blue-700 shadow-md focus:outline-none focus:ring-4 focus:ring-amber-400 focus:scale-105 transition-all text-xs">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Big White solid Play button -->
+            <button onclick="startGame(); playSfx('start');" 
+                    class="btn-3d-rose mt-4 px-16 py-5 rounded-full font-black text-2xl tracking-tighter uppercase border-4 border-white transition-all">
+                PLAY
+            </button>
+        </div>
+
+
+        <!-- PAGE 3: GUESSING SCREEN -->
+        <div id="page-guessing" class="page-transition hidden flex flex-col items-center justify-center flex-1 py-1 w-full">
+            
+            <!-- Styled White Product Card Centerpiece -->
+            <div class="w-full max-w-xl bg-white rounded-3xl p-6 shadow-2xl relative border-8 border-amber-400 flex flex-col items-center justify-center min-h-[260px]">
+                <div id="guessing-item-image-box" class="bg-slate-100 rounded-xl relative overflow-hidden flex items-center justify-center w-full h-44">
+                    <!-- Dynamic Product SVG or Uploaded image will render here -->
+                </div>
+                <div id="guessing-item-name" class="text-blue-900 font-extrabold text-lg tracking-tight mt-3 uppercase text-center block max-w-sm truncate italic">
+                    ALMARAI CARTON
+                </div>
+            </div>
+
+            <!-- Embedded "GUESS THE PRICE" Banner overlapping layout -->
+            <div class="bg-blue-800 border-4 border-blue-400 px-10 py-3 rounded-2xl shadow-xl -mt-5 z-20">
+                <h2 class="text-white font-black text-lg md:text-xl tracking-wider uppercase text-center drop-shadow-md">
+                    GUESS THE PRICE
+                </h2>
+            </div>
+
+            <!-- Connection lines branching to Team Answers & lock button -->
+            <div class="w-full max-w-xl flex flex-col items-center relative">
+                <div class="w-full h-10 relative">
+                    <svg class="w-full h-full" viewBox="0 0 600 40" preserveAspectRatio="none">
+                        <path d="M 300 0 L 300 14" stroke="white" stroke-width="2.5" fill="none" />
+                        <path d="M 110 14 L 490 14" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <path d="M 110 14 L 110 40" stroke="white" stroke-width="2.5" fill="none" />
+                        <path d="M 300 14 L 300 40" stroke="white" stroke-width="2.5" fill="none" />
+                        <path d="M 490 14 L 490 40" stroke="white" stroke-width="2.5" fill="none" />
+                    </svg>
+                </div>
+
+                <!-- Input branches on the left and right, LOCK button in the absolute center -->
+                <div class="w-full flex justify-between gap-4">
+                    
+                    <!-- Team A Input field -->
+                    <div class="bg-blue-800 rounded-2xl p-4 border-2 border-blue-400 flex flex-col justify-between flex-grow shadow-lg w-[180px]">
+                        <div class="flex justify-between items-center mb-1.5 min-w-0">
+                            <span id="guessing-team-a-label" class="text-[10px] font-bold uppercase text-amber-400 truncate max-w-[110px]">TEAM A Guess</span>
+                            <div class="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse flex-shrink-0"></div>
+                        </div>
+                        <div class="relative w-full">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-2xl font-black text-blue-400 opacity-50 select-none">﷼</span>
+                            <input type="number" step="0.01" min="0" id="guess-input-a" placeholder="0.00"
+                                   class="w-full bg-blue-950 border-2 border-blue-400 rounded-xl py-2.5 pl-8 pr-2 text-xl font-black text-white focus:outline-none focus:ring-2 focus:ring-amber-400 text-center">
+                        </div>
+                    </div>
+
+                    <!-- Central LOCK/ACTION Button -->
+                    <div class="flex flex-col items-center justify-end w-[130px] pb-2">
+                        <button onclick="lockGuesses();" id="btn-lock-guesses"
+                                class="px-6 py-4 bg-rose-600 text-white rounded-full font-black text-sm uppercase tracking-wider shadow-[0_5px_0_0_rgba(159,18,57,1)] active:shadow-none active:translate-y-[5px] border-2 border-white transition-all hover:bg-rose-500 w-full cursor-pointer">
+                            LOCK IN
+                        </button>
+                    </div>
+
+                    <!-- Team B Input field -->
+                    <div class="bg-blue-800 rounded-2xl p-4 border-2 border-blue-400 flex flex-col justify-between flex-grow shadow-lg w-[180px]">
+                        <div class="flex justify-between items-center mb-1.5 min-w-0">
+                            <span id="guessing-team-b-label" class="text-[10px] font-bold uppercase text-rose-400 truncate max-w-[110px]">TEAM B Guess</span>
+                            <div class="w-2.5 h-2.5 bg-rose-400 rounded-full animate-pulse flex-shrink-0"></div>
+                        </div>
+                        <div class="relative w-full">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-2xl font-black text-blue-400 opacity-50 select-none">﷼</span>
+                            <input type="number" step="0.01" min="0" id="guess-input-b" placeholder="0.00"
+                                   class="w-full bg-blue-950 border-2 border-blue-400 rounded-xl py-2.5 pl-8 pr-2 text-xl font-black text-white focus:outline-none focus:ring-2 focus:ring-amber-400 text-center">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            
+            <!-- Side Pattern Accents (Geometric graphics strictly recreation of Screenshot 3 edge) -->
+            <div class="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 opacity-15 pr-1 pointer-events-none md:flex hidden">
+                <span class="w-6 h-5 stroke-white border-r-4 border-dashed"></span>
+                <span class="w-6 h-5 stroke-white border-r-4 border-dashed"></span>
+                <span class="w-6 h-5 stroke-white border-r-4 border-dashed"></span>
+            </div>
+        </div>
+
+
+        <!-- PAGE 4: REVEAL SCREEN -->
+        <div id="page-reveal" class="page-transition hidden flex flex-col items-center justify-center flex-1 py-1 w-full">
+            
+            <!-- Product illustration container -->
+            <div class="w-full max-w-xl bg-white rounded-3xl p-6 shadow-2xl relative border-8 border-amber-400 flex flex-col items-center justify-center min-h-[220px] transition-transform duration-500 scale-95 opacity-100">
+                <div id="reveal-item-image-box" class="bg-slate-100 rounded-xl relative overflow-hidden flex items-center justify-center w-full h-36">
+                    <!-- Dynamic SVG vector -->
+                </div>
+                <div id="reveal-item-name" class="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-2">
+                    ALMARAI CARTON
+                </div>
+            </div>
+
+            <!-- "THE PRICE IS" Overlapping Banner -->
+            <div class="bg-blue-800 border-4 border-blue-400 px-10 py-3 rounded-2xl shadow-xl -mt-5 z-20">
+                <h2 class="text-white font-black text-sm tracking-wide uppercase text-center drop-shadow-md">
+                    THE PRICE IS
+                </h2>
+            </div>
+
+            <!-- Huge actual price text -->
+            <div class="bg-amber-400 border-4 border-white shadow-lg text-blue-950 px-8 py-3 rounded-2xl mt-4 mb-2 flex items-center gap-2 transform hover:scale-105 transition-transform">
+                <div class="text-4xl font-extrabold font-mono tracking-wide text-blue-950 drop-shadow flex items-center gap-1.5">
+                    <span class="font-extrabold text-blue-900">﷼</span>
+                    <span id="reveal-actual-price">69.99</span>
+                </div>
+            </div>
+
+            <!-- Branch connection lines branching to Reveal team answers & NEXT button -->
+            <div class="w-full max-w-xl flex flex-col items-center relative">
+                <div class="w-full h-8 relative">
+                    <svg class="w-full h-full" viewBox="0 0 600 32" preserveAspectRatio="none">
+                        <path d="M 300 0 L 300 14" stroke="white" stroke-width="2.5" fill="none" />
+                        <path d="M 110 14 L 490 14" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <path d="M 110 14 L 110 32" stroke="white" stroke-width="2.5" fill="none" />
+                        <path d="M 300 14 L 300 32" stroke="white" stroke-width="2.5" fill="none" />
+                        <path d="M 490 14 L 490 32" stroke="white" stroke-width="2.5" fill="none" />
+                    </svg>
+                </div>
+
+                <!-- Reveal Outcome Display: Team A Box, Action Next Button, Team B Box -->
+                <div class="w-full flex justify-between items-center gap-4">
+                    
+                    <!-- Team A score card outcome -->
+                    <div class="flex flex-col justify-between bg-blue-800 border-2 border-blue-400 p-4 rounded-2xl shadow-lg w-[180px] transition-all duration-300" id="reveal-box-container-a">
+                        <div class="flex justify-between items-center mb-1.5 min-w-0">
+                            <span id="reveal-team-a-label" class="text-[10px] font-bold uppercase text-amber-400 truncate max-w-[120px]">TEAM A</span>
+                        </div>
+                        <div id="reveal-card-a" class="w-full py-2 rounded-xl text-center font-black text-sm shadow-md border-2 bg-blue-950 text-blue-400 border-blue-400/40 transition-all flex justify-center items-center gap-1 duration-500">
+                            <span>﷼</span>
+                            <span id="reveal-guess-a">55</span>
+                        </div>
+                        <span id="reveal-diff-a" class="text-[9.5px] font-mono mt-2 font-bold text-blue-300 text-center"></span>
+                    </div>
+
+                    <!-- Central NEXT ROUND Button -->
+                    <div class="flex flex-col justify-end w-[130px] pb-1">
+                        <button onclick="nextRound();" id="btn-next-round"
+                                class="px-4 py-3 bg-white text-blue-900 rounded-xl font-bold uppercase text-xs tracking-wider border-2 border-blue-400 hover:bg-neutral-50 transition-all font-sans text-center cursor-pointer">
+                            NEXT ROUND
+                        </button>
+                    </div>
+
+                    <!-- Team B score card outcome -->
+                    <div class="flex flex-col justify-between bg-blue-800 border-2 border-blue-400 p-4 rounded-2xl shadow-lg w-[180px] transition-all duration-300" id="reveal-box-container-b">
+                        <div class="flex justify-between items-center mb-1.5 min-w-0">
+                            <span id="reveal-team-b-label" class="text-[10px] font-bold uppercase text-rose-400 truncate max-w-[120px]">TEAM B</span>
+                        </div>
+                        <div id="reveal-card-b" class="w-full py-2 rounded-xl text-center font-black text-sm shadow-md border-2 bg-blue-950 text-blue-400 border-blue-400/40 transition-all flex justify-center items-center gap-1 duration-500">
+                            <span>﷼</span>
+                            <span id="reveal-guess-b">65</span>
+                        </div>
+                        <span id="reveal-diff-b" class="text-[9.5px] font-mono mt-2 font-bold text-blue-300 text-center"></span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+
+        <!-- PAGE 5: GAME OVER / WINNER CELEBRATION -->
+        <div id="page-winner" class="page-transition hidden flex flex-col items-center justify-center flex-1 py-4 gap-6 text-center">
+            <svg class="w-16 h-16 fill-amber-400 text-amber-400 animate-bounce" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+            </svg>
+            
+            <div>
+                <h1 class="text-white/80 font-extrabold text-[10px] tracking-widest uppercase mb-1">FINAL RESULTS</h1>
+                <h2 id="winner-celebration-title" class="text-amber-400 font-extrabold text-3xl md:text-4xl tracking-tight uppercase px-4 drop-shadow-md">
+                    TEAM B WINS!
+                </h2>
+                <p id="winner-celebration-subtitle" class="text-blue-200 text-xs italic mt-2">What a brilliant game of price deduction!</p>
+            </div>
+
+            <!-- Final Comparison box -->
+            <div class="w-full max-w-sm bg-blue-800 p-6 rounded-2xl border-4 border-blue-400 shadow-2xl">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col items-center p-3 rounded-xl bg-blue-950 border border-blue-400/30">
+                        <span id="winner-summary-team-a-name" class="font-extrabold text-[10px] text-amber-400 uppercase tracking-widest truncate w-full">TEAM A</span>
+                        <span id="winner-summary-team-a-score" class="font-mono font-black text-4xl text-white mt-1">0</span>
+                        <span class="text-[8px] text-blue-300 font-bold mt-1">ROUND POINTS</span>
+                    </div>
+                    <div class="flex flex-col items-center p-3 rounded-xl bg-blue-950 border border-blue-400/30">
+                        <span id="winner-summary-team-b-name" class="font-extrabold text-[10px] text-rose-400 uppercase tracking-widest truncate w-full">TEAM B</span>
+                        <span id="winner-summary-team-b-score" class="font-mono font-black text-4xl text-white mt-1">0</span>
+                        <span class="text-[8px] text-blue-300 font-bold mt-1">ROUND POINTS</span>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="goToPage('setup'); playSfx('click');" 
+                    class="bg-white text-blue-950 border-4 border-blue-400 hover:bg-neutral-50 hover:scale-105 active:scale-95 transition-all font-black text-sm tracking-widest uppercase px-12 py-3.5 rounded-full shadow-lg cursor-pointer">
+                PLAY AGAIN
+            </button>
+        </div>
+
+
+        <!-- PAGE 6: MANAGE ITEMS (SETTINGS) -->
+        <div id="page-manage" class="page-transition hidden flex flex-col justify-start flex-1 py-1 gap-4 w-full h-full">
+            
+            <div class="flex justify-between items-center w-full">
+                <!-- Title badge mimicking Screenshot 4 "MANAGE ITEMS" -->
+                <div class="bg-white px-5 py-2.5 rounded-xl shadow-md border-2 border-blue-400">
+                    <h2 class="text-blue-950 font-black text-xs md:text-sm tracking-widest uppercase animate-pulse">
+                        MANAGE ITEMS
+                    </h2>
+                </div>
+                
+                <button onclick="goToPage('setup'); playSfx('click');" class="bg-black/20 hover:bg-black/40 text-white font-black text-[10px] tracking-wide px-4 py-2 rounded-xl transition-all cursor-pointer">
+                    BACK
+                </button>
+            </div>
+
+            <!-- Grid container of products list -->
+            <div id="items-management-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 flex-1 overflow-y-auto max-h-[300px] pr-1 py-1">
+                <!-- Populated dynamically via script with customizable delete buttons -->
+            </div>
+
+            <!-- Operational navigation at bottom of index -->
+            <div class="w-full flex justify-center items-center mt-2 pt-2 border-t border-blue-800">
+                <!-- Rose circle action button for page 6 "ADD NEW ITEM" screen -->
+                <button onclick="goToPage('add_item'); playSfx('click');" 
+                        class="bg-rose-600 hover:bg-rose-500 active:scale-95 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-all scale-110 cursor-pointer"
+                        title="Add New Item">
+                    <svg class="w-6 h-6 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" stroke-width="3" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+
+        <!-- PAGE 7: ADD NEW ITEM -->
+        <div id="page-add_item" class="page-transition hidden flex flex-col justify-start flex-1 py-1 gap-4 w-full h-full">
+            
+            <!-- Title badge mimicking Screenshot 5 "ADD NEW ITEM" -->
+            <div class="bg-white w-max px-5 py-2.5 rounded-xl shadow-md border-2 border-blue-400">
+                <h2 class="text-blue-950 font-black text-xs md:text-sm tracking-widest uppercase">
+                    ADD NEW ITEM
+                </h2>
+            </div>
+
+            <!-- Add Item Layout Container -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2 flex-1 items-start">
+                
+                <!-- Form input block on the left side -->
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label class="text-[10px] font-black tracking-widest text-[#98dfaf] uppercase mb-1.5 block">Item Name</label>
+                        <input type="text" id="add-item-name" placeholder="E.G. IPHONE 19 PRO MAX"
+                               class="w-full bg-blue-950 text-white border-2 border-blue-400 font-bold text-xs px-4 py-3.5 rounded-xl shadow-md focus:outline-none focus:ring-4 focus:ring-amber-400 capitalize placeholder-blue-700/60">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black tracking-widest text-[#98dfaf] uppercase mb-1.5 block">Actual Price</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 font-extrabold text-xs">﷼</span>
+                            <input type="number" step="0.01" min="0" id="add-item-price" placeholder="E.G. 4900"
+                                   class="w-full bg-blue-950 text-white border-2 border-blue-400 font-bold text-xs pl-8 pr-4 py-3.5 rounded-xl shadow-md focus:outline-none focus:ring-4 focus:ring-amber-400 placeholder-blue-700/60">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Image Upload zone on the right side -->
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-black tracking-widest text-[#98dfaf] uppercase mb-1.5 block">Item Image</label>
+                    
+                    <div class="relative w-full aspect-video md:aspect-square md:max-h-52">
+                        <!-- File Upload input hidden overlay -->
+                        <input type="file" id="add-item-file" accept="image/*" onchange="previewUploadedImage(event)" 
+                               class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-20">
+                        
+                        <!-- Tap box representing illustration upload container -->
+                        <div id="add-item-upload-placeholder" 
+                             class="w-full h-full rounded-[1.5rem] border-4 border-dashed border-blue-400 bg-blue-950 flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-all hover:bg-black/20">
+                            
+                            <svg class="w-8 h-8 text-amber-350 text-amber-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <circle cx="12" cy="13" r="3" />
+                            </svg>
+                            <span class="text-white text-[10px] font-black tracking-wider uppercase">TAP TO UPLOAD IMAGE</span>
+                        </div>
+
+                        <!-- Image Display Card for active previewing -->
+                        <div id="add-item-preview-container" class="hidden w-full h-full rounded-[1.5rem] border-4 border-white bg-white shadow-md p-2 flex items-center justify-center relative">
+                            <img id="add-item-preview-tag" src="" alt="preview" class="max-w-full max-h-full object-contain rounded-xl">
+                            <!-- Overlay click to change -->
+                            <div class="absolute inset-x-2 bottom-2 bg-black/60 text-white rounded-lg py-1 text-center font-bold text-[8px] uppercase tracking-widest">
+                                CLICK TO CHANGE
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save progress action buttons -->
+            <div class="flex justify-between items-center mt-3 pt-3 border-t border-blue-800">
+                <button onclick="goToPage('manage'); playSfx('click');" 
+                        class="bg-black/20 hover:bg-black/40 text-white border border-blue-400 font-black text-xs px-6 py-3.5 rounded-xl transition-all cursor-pointer">
+                    CANCEL
+                </button>
+                <button onclick="handleSaveNewItem();" 
+                        class="px-8 py-3.5 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black text-xs tracking-wider rounded-xl uppercase transition-all cursor-pointer">
+                    SAVE & CLOSE
+                </button>
+            </div>
+        </div>
+
+        <!-- ======================= BOTTOM UTILITIES PANEL ======================= -->
+        <div class="flex justify-between items-center mt-6 w-full text-[9px] text-blue-300/40">
+            <div class="flex items-center gap-1">
+                <span>CURRENCY ACCENT: </span>
+                <span class="font-extrabold text-amber-400">SAR (﷼)</span>
+            </div>
+            <div>
+                <span>The Price Is Right — Made By Rafey</span>
+            </div>
+        </div>
+        </div>
+
+    </div>
+
+    <!-- AUDIO SYNTHESIS ENGINE (Uses pure browser Web Audio API for offline sound feedback) -->
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        /**
+         * Synthesizes audio frequencies organically for gorgeous 8-bit retro sound feedback.
+         * Runs offline, requiring zero external server resources or slow audio files.
+         */
+        function playSfx(type) {
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'click') {
+                    // Quick friendly neutral pluck
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } 
+                else if (type === 'start') {
+                    // Multi-tone cheerful opening sweep
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(261.63, now); // C4
+                    osc.frequency.setValueAtTime(329.63, now + 0.08); // E4
+                    osc.frequency.setValueAtTime(392.00, now + 0.16); // G4
+                    osc.frequency.exponentialRampToValueAtTime(523.25, now + 0.3); // C5
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.setValueAtTime(0.2, now + 0.2);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+                    osc.start(now);
+                    osc.stop(now + 0.45);
+                }
+                else if (type === 'correct') {
+                    // Joyous high tone ring
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, now); // D5
+                    osc.frequency.setValueAtTime(880.00, now + 0.08); // A5
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                }
+                else if (type === 'wrong') {
+                    // Sad boing flat sound
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.linearRampToValueAtTime(110, now + 0.25);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+                    osc.start(now);
+                    osc.stop(now + 0.28);
+                }
+                else if (type === 'gameover') {
+                    // Ultimate victory sweep sound
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.5);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                }
+            } catch (e) {
+                console.warn('Audio Context is locked or unsupported: ', e);
+            }
+        }
+    </script>
+
+    <!-- CORE GAME SCRIPTS -->
+    <script>
+        // =========================================================================
+        // FULLSCREEN API COUPLERS FOR ANDROID CHROME & IOS SAFARI / MOBILE BROWSERS
+        // =========================================================================
+        function toggleDocFullscreen() {
+            playSfx('click');
+            const docEl = document.documentElement;
+            const doc = document;
+            
+            const isFull = !!(doc.fullscreenElement || doc.mozFullScreenElement || doc.webkitFullScreenElement || doc.msFullscreenElement);
+            
+            if (!isFull) {
+                if (docEl.requestFullscreen) {
+                    docEl.requestFullscreen();
+                } else if (docEl.mozRequestFullScreen) {
+                    docEl.mozRequestFullScreen();
+                } else if (docEl.webkitRequestFullscreen) {
+                    docEl.webkitRequestFullscreen();
+                } else if (docEl.msRequestFullscreen) {
+                    docEl.msRequestFullscreen();
+                }
+            } else {
+                if (doc.exitFullscreen) {
+                    doc.exitFullscreen();
+                } else if (doc.mozCancelFullScreen) {
+                    doc.mozCancelFullScreen();
+                } else if (doc.webkitExitFullscreen) {
+                    doc.webkitExitFullscreen();
+                } else if (doc.msExitFullscreen) {
+                    doc.msExitFullscreen();
+                }
+            }
+        }
+
+        function updateFullscreenIcon() {
+            const doc = document;
+            const isFull = !!(doc.fullscreenElement || doc.mozFullScreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement);
+            const iconSvg = document.getElementById('fullscreen-icon');
+            if (iconSvg) {
+                if (isFull) {
+                    // Minimize SVG Path
+                    iconSvg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9V4.5M15 9h4.5M15 9l5.25-5.25M15 15v4.5M15 15h4.5M15 15l5.25 5.25" />';
+                } else {
+                    // Maximize SVG Path
+                    iconSvg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15" />';
+                }
+            }
+        }
+
+        document.addEventListener('fullscreenchange', updateFullscreenIcon);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+        document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
+        document.addEventListener('MSFullscreenChange', updateFullscreenIcon);
+
+        // =========================================================================
+        // EDITABLE DATABASE POOL OF PRODUCTS
+        // Edit these items freely. You can change prices, names, and images.
+        // Valid image keys are: "svg-milk-carton", "svg-iphone", "svg-ps5", "svg-camera", "svg-sneakers", "svg-rolex"
+        // Or you can type actual web URLs or upload image files using Page 6 (storing to local storage).
+        // =========================================================================
+        const INITIAL_DEFAULT_ITEMS = [
+  {
+    "id": "1",
+    "name": "ALMARAI CARTON",
+    "price": 69.99,
+    "image": "svg-milk-carton"
+  },
+  {
+    "id": "2",
+    "name": "IPHONE 15 PRO MAX",
+    "price": 1299,
+    "image": "svg-iphone"
+  },
+  {
+    "id": "3",
+    "name": "PLAYSTATION 5 PRO",
+    "price": 699,
+    "image": "svg-ps5"
+  },
+  {
+    "id": "4",
+    "name": "RETRO CAMERA",
+    "price": 849,
+    "image": "svg-camera"
+  },
+  {
+    "id": "5",
+    "name": "NIKE AIR SNEAKERS",
+    "price": 180,
+    "image": "svg-sneakers"
+  },
+  {
+    "id": "6",
+    "name": "GOLDEN ROLEX WATCH",
+    "price": 10500,
+    "image": "svg-rolex"
+  }
+];
+
+        // =========================================================================
+        // PROGRAMMATIC VARIABLE STATE MANAGERS
+        // =========================================================================
+        let items = [];
+        let shuffledPool = [];
+        let currentItemIndex = 0;
+        let teamAName = "TEAM A";
+        let teamBName = "TEAM B";
+        let scoreA = 0;
+        let scoreB = 0;
+        let currentItem = null;
+
+        // Custom image file uploaded temporarily as base64 string
+        let uploadedImageBase64 = null;
+
+        /**
+         * Initialize application database and local storage states.
+         */
+        window.onload = function() {
+            // Retrieve local storage custom items if existing
+            const storedLocalCustoms = localStorage.getItem('the_price_is_right_custom_items');
+            const customItems = storedLocalCustoms ? JSON.parse(storedLocalCustoms) : [];
+            
+            // Retrieve deleted item IDs to persist removals
+            const storedDeletedIds = localStorage.getItem('the_price_is_right_deleted_items');
+            const deletedIds = storedDeletedIds ? JSON.parse(storedDeletedIds) : [];
+            
+            // Merge defaults and customs
+            const allMerged = [...INITIAL_DEFAULT_ITEMS, ...customItems];
+            items = allMerged.filter(it => !deletedIds.includes(it.id));
+            
+            // Render default listings on load
+            renderManageItemsGrid();
+            goToPage('home');
+        };
+
+        /**
+         * Navigates clean page-to-page states using flex layouts.
+         */
+        function goToPage(pageId) {
+            // Hide all pages
+            const pages = ['home', 'setup', 'guessing', 'reveal', 'winner', 'manage', 'add_item'];
+            pages.forEach(p => {
+                const el = document.getElementById('page-' + p);
+                if (el) el.classList.add('hidden');
+            });
+
+            // Show selected page
+            const activePage = document.getElementById('page-' + pageId);
+            if (activePage) activePage.classList.remove('hidden');
+
+            // Set HUD visibility
+            const sb = document.getElementById('scoreboard');
+            const topLogo = document.getElementById('top-logo-container');
+            
+            if (pageId === 'guessing' || pageId === 'reveal') {
+                sb.classList.remove('hidden');
+                topLogo.classList.remove('opacity-0');
+            } else if (pageId === 'home') {
+                sb.classList.add('hidden');
+                topLogo.classList.add('opacity-0');
+            } else {
+                sb.classList.add('hidden');
+                topLogo.classList.remove('opacity-0');
+            }
+
+            // Sync scores inside HUD if in game
+            document.getElementById('scoreboard-team-a-name').innerText = teamAName;
+            document.getElementById('scoreboard-team-b-name').innerText = teamBName;
+            document.getElementById('scoreboard-team-a-score').innerText = scoreA;
+            document.getElementById('scoreboard-team-b-score').innerText = scoreB;
+        }
+
+        /**
+         * Shuffles the array logic using the legendary Fisher-Yates method.
+         */
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex != 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        /**
+         * Starts the game, shuffles the pool of items, and launches Page 3.
+         */
+        function startGame() {
+            // Capture team names
+            const inputA = document.getElementById('team-a-input').value.trim();
+            const inputB = document.getElementById('team-b-input').value.trim();
+            teamAName = inputA !== "" ? inputA.toUpperCase() : "TEAM A";
+            teamBName = inputB !== "" ? inputB.toUpperCase() : "TEAM B";
+
+            // Reset scores
+            scoreA = 0;
+            scoreB = 0;
+
+            // Make sure we have items
+            if (items.length === 0) {
+                alert("The item database is empty. Add items using settings before playing!");
+                goToPage('manage');
+                return;
+            }
+
+            // Shuffle pricing pool
+            shuffledPool = shuffle([...items]);
+            currentItemIndex = 0;
+
+            loadRoundItem();
+        }
+
+        /**
+         * Loads the current round's product card.
+         */
+        function loadRoundItem() {
+            currentItem = shuffledPool[currentItemIndex];
+            
+            // Populate Guessing screen values
+            document.getElementById('guessing-item-name').innerText = currentItem.name;
+            
+            // Set input headings
+            document.getElementById('guessing-team-a-label').innerText = teamAName + " GUESS";
+            document.getElementById('guessing-team-b-label').innerText = teamBName + " GUESS";
+
+            // Clear guess entries
+            document.getElementById('guess-input-a').value = '';
+            document.getElementById('guess-input-b').value = '';
+
+            // Inject vector graphic asset
+            const imageBox = document.getElementById('guessing-item-image-box');
+            imageBox.innerHTML = renderItemImageElement(currentItem);
+
+            goToPage('guessing');
+        }
+
+        /**
+         * Validates and locks guesses, comparing points and launching Reveal Screen.
+         */
+        function lockGuesses() {
+            const guessValA = parseFloat(document.getElementById('guess-input-a').value);
+            const guessValB = parseFloat(document.getElementById('guess-input-b').value);
+
+            if (isNaN(guessValA) || isNaN(guessValB)) {
+                alert("Both teams must enter a valid price guess before locking answers!");
+                playSfx('wrong');
+                return;
+            }
+
+            // Calculate winners
+            const actual = currentItem.price;
+
+            // Difference calculation
+            const diffA = Math.abs(guessValA - actual);
+            const diffB = Math.abs(guessValB - actual);
+
+            let winA = false;
+            let winB = false;
+
+            if (diffA === diffB) {
+                // Perfect Tie
+                winA = true;
+                winB = true;
+                scoreA += 1;
+                scoreB += 1;
+            } else if (diffA < diffB) {
+                // Team A Closer
+                winA = true;
+                scoreA += 1;
+            } else {
+                // Team B Closer
+                winB = true;
+                scoreB += 1;
+            }
+
+            // Synthesize SFX based on who scored
+            if (winA && winB) {
+                playSfx('correct');
+            } else {
+                playSfx('correct');
+            }
+
+            // Sync scoreboard scores
+            document.getElementById('scoreboard-team-a-score').innerText = scoreA;
+            document.getElementById('scoreboard-team-b-score').innerText = scoreB;
+
+            // Render Reveal screen
+            document.getElementById('reveal-item-name').innerText = currentItem.name;
+            document.getElementById('reveal-actual-price').innerText = actual.toFixed(2);
+            document.getElementById('reveal-item-image-box').innerHTML = renderItemImageElement(currentItem);
+
+            // Set labels
+            document.getElementById('reveal-team-a-label').innerText = teamAName + " GUESS";
+            document.getElementById('reveal-team-b-label').innerText = teamBName + " GUESS";
+
+            // Fill cards
+            document.getElementById('reveal-guess-a').innerText = guessValA.toFixed(2);
+            document.getElementById('reveal-guess-b').innerText = guessValB.toFixed(2);
+
+            // Diff sub-titles
+            document.getElementById('reveal-diff-a').innerText = "DIFF: ﷼" + diffA.toFixed(2);
+            document.getElementById('reveal-diff-b').innerText = "DIFF: ﷼" + diffB.toFixed(2);
+
+            // Styling Reveal Answer Cards:
+            const cardA = document.getElementById('reveal-card-a');
+            const cardB = document.getElementById('reveal-card-b');
+            const containerA = document.getElementById('reveal-box-container-a');
+            const containerB = document.getElementById('reveal-box-container-b');
+
+            // Reset classes
+            cardA.className = "w-full py-3.5 rounded-full text-center font-black text-base shadow-lg border-2 border-transparent transition-all flex justify-center items-center gap-1.5 duration-500";
+            cardB.className = "w-full py-3.5 rounded-full text-center font-black text-base shadow-lg border-2 border-transparent transition-all flex justify-center items-center gap-1.5 duration-500";
+            containerA.className = "flex flex-col items-center w-[170px] transition-all duration-300";
+            containerB.className = "flex flex-col items-center w-[170px] transition-all duration-300";
+
+            // Apply specific winner indicators:
+            if (winA && winB) {
+                // Both exact ties!
+                cardA.classList.add('bg-white', 'text-blue-900', 'border-blue-400');
+                cardB.classList.add('bg-white', 'text-blue-900', 'border-blue-400');
+                containerA.classList.add('scale-105');
+                containerB.classList.add('scale-105');
+            } else if (winA) {
+                // Team A wins this turn
+                cardA.classList.add('bg-white', 'text-blue-900', 'border-amber-400');
+                containerA.classList.add('scale-110', 'z-10');
+                
+                // Team B turned red
+                cardB.classList.add('bg-rose-600', 'text-white');
+                containerB.classList.add('scale-90', 'opacity-70');
+            } else {
+                // Team B wins this turn
+                cardB.classList.add('bg-white', 'text-blue-900', 'border-amber-400');
+                containerB.classList.add('scale-110', 'z-10');
+
+                // Team A turned red
+                cardA.classList.add('bg-rose-600', 'text-white');
+                containerA.classList.add('scale-90', 'opacity-70');
+            }
+
+            // Change button text to "Winner" if last index
+            const btnNext = document.getElementById('btn-next-round');
+            if (currentItemIndex === shuffledPool.length - 1) {
+                btnNext.innerText = "VIEW WINNER";
+            } else {
+                btnNext.innerText = "NEXT ROUND";
+            }
+
+            goToPage('reveal');
+        }
+
+        /**
+         * Proceeds to next random round item, or goes to victory screen.
+         */
+        function nextRound() {
+            if (currentItemIndex < shuffledPool.length - 1) {
+                currentItemIndex++;
+                loadRoundItem();
+                playSfx('click');
+            } else {
+                // End game! Show winner screens
+                declareGameWinner();
+            }
+        }
+
+        /**
+         * Calculates final winner state, showing celebration screen.
+         */
+        function declareGameWinner() {
+            playSfx('gameover');
+            
+            // Set team names inside summary
+            document.getElementById('winner-summary-team-a-name').innerText = teamAName;
+            document.getElementById('winner-summary-team-b-name').innerText = teamBName;
+            
+            // Set points
+            document.getElementById('winner-summary-team-a-score').innerText = scoreA;
+            document.getElementById('winner-summary-team-b-score').innerText = scoreB;
+
+            const title = document.getElementById('winner-celebration-title');
+            const sub = document.getElementById('winner-celebration-subtitle');
+
+            if (scoreA === scoreB) {
+                title.innerText = "IT'S A PRICE TIE!";
+                sub.innerText = "Both teams matched each other's retail deduction skills!";
+                title.className = "text-yellow-300 font-extrabold text-3xl tracking-tight uppercase px-4 drop-shadow-md";
+            } else if (scoreA > scoreB) {
+                title.innerText = teamAName + " WINS!";
+                sub.innerText = "The pricing masterminds of " + teamAName + " take home the trophy!";
+                title.className = "text-yellow-400 font-extrabold text-3xl tracking-tight uppercase px-4 drop-shadow-md";
+            } else {
+                title.innerText = teamBName + " WINS!";
+                sub.innerText = "The pricing masterminds of " + teamBName + " take home the trophy!";
+                title.className = "text-yellow-400 font-extrabold text-3xl tracking-tight uppercase px-4 drop-shadow-md";
+            }
+
+            goToPage('winner');
+        }
+
+        /**
+         * Renders the grid listing of products in operational inventory.
+         */
+        function renderManageItemsGrid() {
+            const grid = document.getElementById('items-management-grid');
+            grid.innerHTML = '';
+
+            items.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = "bg-[#1c3e27] border-2 border-[#3d8353] rounded-2xl p-4 flex items-center justify-between shadow-lg hover:border-[#5bb57a] transition-all";
+                
+                // Left: display image & text info
+                const infoDiv = document.createElement('div');
+                infoDiv.className = "flex items-center gap-4 flex-1 mr-2 min-w-0";
+                
+                // Mini image frame
+                const imageFrame = document.createElement('div');
+                imageFrame.className = "w-16 h-16 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-inner flex-shrink-0";
+                imageFrame.innerHTML = renderItemImageElement(item);
+                
+                // Name and price text
+                const textFrame = document.createElement('div');
+                textFrame.className = "min-w-0 flex-1";
+                
+                const nameLabel = document.createElement('h3');
+                nameLabel.className = "text-white font-extrabold text-xs uppercase tracking-wider truncate";
+                nameLabel.innerText = item.name;
+                
+                const valueLabel = document.createElement('span');
+                valueLabel.className = "text-[#98dfaf] font-mono font-bold text-xs mt-0.5 block";
+                valueLabel.innerText = "﷼ " + item.price.toFixed(2);
+
+                textFrame.appendChild(nameLabel);
+                textFrame.appendChild(valueLabel);
+                
+                infoDiv.appendChild(imageFrame);
+                infoDiv.appendChild(textFrame);
+
+                // Right: Remove item button
+                const btnRemove = document.createElement('button');
+                btnRemove.className = "bg-[#C01C47] hover:bg-[#a01639] active:scale-95 text-white font-extrabold text-[8px] tracking-widest uppercase px-3 py-2 rounded-xl border border-black/10 transition-all flex-shrink-0";
+                btnRemove.innerText = "REMOVE ITEM";
+                btnRemove.onclick = function() {
+                    handleRemoveItem(item.id);
+                };
+
+                card.appendChild(infoDiv);
+                card.appendChild(btnRemove);
+                grid.appendChild(card);
+            });
+        }
+
+        /**
+         * Deletes an item from the pool, resolving custom local persistence.
+         */
+        function handleRemoveItem(id) {
+            playSfx('wrong');
+            
+            // Check if it exists in Default items (cant delete easily unless we just filter out)
+            // To make managing extremely dynamic, we let them filter ANY product!
+            items = items.filter(it => it.id !== id);
+            
+            // Save deleted ID to persistent deleted list so it stays deleted
+            try {
+                const storedDeletedIds = localStorage.getItem('the_price_is_right_deleted_items');
+                const deletedIds = storedDeletedIds ? JSON.parse(storedDeletedIds) : [];
+                if (!deletedIds.includes(id)) {
+                    deletedIds.push(id);
+                    localStorage.setItem('the_price_is_right_deleted_items', JSON.stringify(deletedIds));
+                }
+            } catch (e) {
+                console.error("Failed to update deleted items in localStorage: ", e);
+            }
+
+            // Filter custom list inside localStorage to persist deletion for customs
+            const storedLocalCustoms = localStorage.getItem('the_price_is_right_custom_items');
+            if (storedLocalCustoms) {
+                let customs = JSON.parse(storedLocalCustoms);
+                customs = customs.filter(it => it.id !== id);
+                localStorage.setItem('the_price_is_right_custom_items', JSON.stringify(customs));
+            }
+
+            // Re-render
+            renderManageItemsGrid();
+        }
+
+        /**
+         * Receives, processes and caches the uploaded images to temporary base64 formats.
+         */
+        function previewUploadedImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedImageBase64 = e.target.result;
+                
+                // Shift placeholders
+                document.getElementById('add-item-upload-placeholder').classList.add('hidden');
+                
+                const previewCon = document.getElementById('add-item-preview-container');
+                const previewTag = document.getElementById('add-item-preview-tag');
+                
+                previewTag.src = uploadedImageBase64;
+                previewCon.classList.remove('hidden');
+                
+                playSfx('click');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * Validates and registers new customized pricing items.
+         */
+        function handleSaveNewItem() {
+            const nameVal = document.getElementById('add-item-name').value.trim();
+            const priceVal = parseFloat(document.getElementById('add-item-price').value);
+
+            if (nameVal === "") {
+                alert("Please type a valid item name first!");
+                playSfx('wrong');
+                return;
+            }
+            if (isNaN(priceVal) || priceVal <= 0) {
+                alert("Please state a valid numeric price greater than zero!");
+                playSfx('wrong');
+                return;
+            }
+
+            // Determine image
+            const finalImage = uploadedImageBase64 ? uploadedImageBase64 : 'svg-milk-carton'; // Default to milk if missing
+
+            // Build fresh item
+            const newItem = {
+                id: 'custom-' + Date.now(),
+                name: nameVal.toUpperCase(),
+                price: priceVal,
+                image: finalImage,
+                isCustom: true
+            };
+
+            // Add to program state
+            items.push(newItem);
+
+            // Save customs list explicitly to persistence
+            const storedLocalCustoms = localStorage.getItem('the_price_is_right_custom_items');
+            const customs = storedLocalCustoms ? JSON.parse(storedLocalCustoms) : [];
+            customs.push(newItem);
+            localStorage.setItem('the_price_is_right_custom_items', JSON.stringify(customs));
+
+            // Clean form fields
+            document.getElementById('add-item-name').value = '';
+            document.getElementById('add-item-price').value = '';
+            document.getElementById('add-item-file').value = '';
+            uploadedImageBase64 = null;
+
+            // Toggle file display elements back
+            document.getElementById('add-item-upload-placeholder').classList.remove('hidden');
+            document.getElementById('add-item-preview-container').classList.add('hidden');
+
+            // Sound
+            playSfx('correct');
+
+            // Refresh grid
+            renderManageItemsGrid();
+
+            // Return
+            goToPage('setup');
+        }
+
+        /**
+         * Generates HTML components representing our custom vectors or source URLs.
+         */
+        function renderItemImageElement(item) {
+            // Check if dynamic URL or uploaded base64 data URL
+            if (item.image.startsWith('data:') || item.image.startsWith('http') || item.image.startsWith('blob:')) {
+                return '<img src="' + item.image + '" alt="' + item.name + '" class="object-contain max-h-full max-w-full rounded-2xl" />';
+            }
+
+            // Embedded vector graphics mapping
+            if (item.image === 'svg-milk-carton') {
+                return `
+                <svg viewBox="0 0 400 300" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="200" cy="270" rx="140" ry="20" fill="rgba(0,0,0,0.1)" />
+                    <path d="M140 100 L210 120 L210 240 L140 215 Z" fill="#0066cc" />
+                    <path d="M210 120 L270 95 L270 215 L210 240 Z" fill="#0052a3" />
+                    <path d="M140 100 L210 120 L195 70 L130 55 Z" fill="#3b99ff" />
+                    <path d="M210 120 L270 95 L255 45 L195 70 Z" fill="#1f7ae0" />
+                    <path d="M130 55 L195 70 L195 55 L130 40 Z" fill="#004080" />
+                    <path d="M195 70 L255 45 L255 30 L195 55 Z" fill="#003366" />
+                    <path d="M140 160 Q175 190 210 170 L210 240 L140 215 Z" fill="#ffffff" />
+                    <circle cx="175" cy="140" r="14" fill="#2d6a4f" />
+                    <circle cx="175" cy="140" r="12" fill="#d4af37" />
+                    <rect x="150" y="110" width="48" height="14" rx="4" fill="white" />
+                    <text x="174" y="120" font-family="sans-serif" font-size="7" font-weight="bold" fill="#0052a3" text-anchor="middle">Almarai</text>
+                    <text x="175" y="210" font-family="sans-serif" font-size="16" font-weight="bold" fill="#0052a3" text-anchor="middle">حليب</text>
+                    <text x="175" y="224" font-family="sans-serif" font-size="9" font-weight="bold" fill="#2d6a4f" text-anchor="middle">FRESH MILK</text>
+                </svg>`;
+            }
+            if (item.image === 'svg-iphone') {
+                return `
+                <svg viewBox="0 0 400 300" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="200" cy="270" rx="100" ry="15" fill="rgba(0,0,0,0.12)" />
+                    <rect x="145" y="40" width="110" height="210" rx="20" fill="#2d2d2d" stroke="#5d5d5d" stroke-width="3" />
+                    <rect x="151" y="46" width="98" height="198" rx="14" fill="#131315" />
+                    <rect x="180" y="54" width="40" height="10" rx="5" fill="black" />
+                    <g transform="translate(15, 10) scale(0.9)">
+                        <rect x="235" y="40" width="100" height="195" rx="18" fill="#232426" stroke="#434446" stroke-width="2" />
+                        <rect x="242" y="48" width="46" height="46" rx="11" fill="#2b2c2e" />
+                        <circle cx="253" cy="59" r="10" fill="#17181a" stroke="#4d4e51" stroke-width="1.5" />
+                        <circle cx="277" cy="59" r="10" fill="#17181a" stroke="#4d4e51" stroke-width="1.5" />
+                        <circle cx="265" cy="80" r="10" fill="#17181a" stroke="#4d4e51" stroke-width="1.5" />
+                    </g>
+                </svg>`;
+            }
+            if (item.image === 'svg-ps5') {
+                return `
+                <svg viewBox="0 0 400 300" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="200" cy="270" rx="80" ry="12" fill="rgba(0,0,0,0.18)" />
+                    <path d="M190 250 L210 250 L215 70 L185 70 Z" fill="#0d0d0f" />
+                    <path d="M190 250 L155 242 C150 180 152 110 185 45 C186 43 189 45 188 47 Z" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+                    <path d="M210 250 L245 238 C252 175 248 105 215 35 C214 33 211 35 212 37 Z" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+                    <path d="M185 70 C175 120 182 180 190 230" stroke="#38bdf8" stroke-width="2" />
+                </svg>`;
+            }
+            if (item.image === 'svg-camera') {
+                return `
+                <svg viewBox="0 0 400 300" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="200" cy="250" rx="110" ry="12" fill="rgba(0,0,0,0.15)" />
+                    <rect x="110" y="90" width="180" height="130" rx="12" fill="#1c1c1e" stroke="#2c2c2e" stroke-width="2" />
+                    <path d="M110 90 H290 V120 H110 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width="2" />
+                    <circle cx="140" cy="110" r="8" fill="#dc2626" />
+                    <circle cx="200" cy="165" r="58" fill="#111827" stroke="#9ca3af" stroke-width="6" />
+                </svg>`;
+            }
+            if (item.image === 'svg-sneakers') {
+                return `
+                <svg viewBox="0 0 400 300" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="200" cy="265" rx="130" ry="12" fill="rgba(0,0,0,0.13)" />
+                    <path d="M90 230 C90 230 110 252 160 252 C210 252 280 250 310 238 Z" fill="#ffffff" stroke="#e2e8f0" />
+                    <path d="M100 220 L110 110 C140 100 160 130 150 170 Z" fill="#dc2626" />
+                    <path d="M130 175 C160 172 230 183 260 215 C240 215 190 195 145 195 Z" fill="#18181b" />
+                </svg>`;
+            }
+            if (item.image === 'svg-rolex') {
+                return `
+                <svg viewBox="0 0 400 300" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="200" cy="270" rx="90" ry="12" fill="rgba(0,0,0,0.14)" />
+                    <circle cx="200" cy="145" r="56" fill="#cca300" stroke="#b38f00" stroke-width="1.5" />
+                    <circle cx="200" cy="145" r="40" fill="#132a13" stroke="#e6b800" stroke-width="2" />
+                    <line x1="200" y1="145" x2="185" y2="135" stroke="#ffd700" stroke-width="3" />
+                    <line x1="200" y1="145" x2="215" y2="125" stroke="#ffd700" stroke-width="2.2" />
+                </svg>`;
+            }
+
+            return '<div class="w-full h-full bg-slate-100 flex items-center justify-center rounded-2xl"><span class="text-gray-400 font-medium">📦 No Asset</span></div>';
+        }
+    </script>
+
+</body>
+</html>
